@@ -9,11 +9,12 @@ ERC32_PROG = rtems-hello rtems-cdtest \
 	rtems-tasks rtems-synctrap
 
 # LEON2 applications
-LEON2_PROG = rtems-ttcp rtems-hello rtems-cdtest \
-	rtems-tasks rtems-synctrap \
-	rtems-ttcpw rtems-ttcp rtems-shell \
-	rtems-spw-router-pci rtems-tlib
-
+LEON2_PROG = rtems-hello
+# LEON2_PROG = rtems-ttcp rtems-hello rtems-cdtest \
+# 	rtems-tasks rtems-synctrap \
+# 	rtems-ttcpw rtems-ttcp rtems-shell \
+# 	rtems-spw-router-pci rtems-tlib
+# 
 # LEON3 applications
 LEON3_PROGS=rtems-brm_bm rtems-brm_rt rtems-brm_bc \
             rtems-occan rtems-occan_tx rtems-occan_rx \
@@ -30,7 +31,8 @@ CCOPT = -O2
 CFLAGS=
 OUTDIR=
 
-all: leon3v8 leon3fpv8 leon3 leon3fp leon2v8 leon2fpv8 leon2 leon2fp
+all: leon3v8
+#all: leon3v8 leon3fpv8 leon3 leon3fp leon2v8 leon2fpv8 leon2 leon2fp
 
 build: $(LEON2_PROG)
 
@@ -60,7 +62,7 @@ leon3fpv8:
 	$(MAKE) OUTDIR="bin/leon3/v8fp/" CFLAGS="-mcpu=v8" build build_leon3
 
 leon3v8:
-	$(MAKE) OUTDIR="bin/leon3/v8/" CFLAGS="-mcpu=v8 -msoft-float" build build_leon3
+	$(MAKE) OUTDIR="bin/leon3/v8/" CFLAGS="-mcpu=v8 -msoft-float" build
 
 erc32:
 	$(MAKE) OUTDIR="bin/erc32/" CFLAGS=-tsc691 build_erc32
