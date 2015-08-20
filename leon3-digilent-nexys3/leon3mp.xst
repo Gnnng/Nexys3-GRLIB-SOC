@@ -10,4 +10,4 @@ run
 -ifmt mixed
 -p XC6SLX16-csg324-2
 -top leon3mp
--ofn leon3mp -uc leon3mp.xcf -define {XSTDUMMY } -sd ../../netlists/xilinx/Spartan3
+-ofn leon3mp -uc leon3mp.xcf -define {XSTDUMMY } -sd /home/gnnng/workspace/grlib/netlists/xilinx/Spartan3

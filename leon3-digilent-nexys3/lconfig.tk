@@ -644,7 +644,7 @@ set active_menus [list]
 set processed_top_level 0
 set ARCH sparc
 set menus_per_column 4
-set total_menus 24
+set total_menus 25
 
 proc toplevel_menu {num} {
 	if {$num == 4} then {return 3}
@@ -664,6 +664,7 @@ proc toplevel_menu {num} {
 	if {$num == 21} then {return 13}
 	if {$num == 22} then {return 21}
 	if {$num == 23} then {return 21}
+	if {$num == 24} then {return 13}
 	return $num
 }
 
@@ -3346,6 +3347,7 @@ proc menu13 {w title} {
 	submenu $w.config.f 13 2 "Ethernet             " 19
 	submenu $w.config.f 13 3 "UARTs, timers and irq control         " 20
 	submenu $w.config.f 13 4 "SPI" 21
+	submenu $w.config.f 13 5 "ps2vga" 24
 
 
 
@@ -4741,7 +4743,7 @@ proc menu23 {w title} {
 	wm title $w "SPI controller(s) " 
 
 	bind $w <Escape> "catch {focus $oldFocus}; destroy $w; unregister_active 23; break"
-	set nextscript "catch {focus $oldFocus}; destroy $w; unregister_active 23; catch {destroy .menu21}; unregister_active 21; catch {destroy .menu13}; unregister_active 13; menu24 .menu24 \"$title\""
+	set nextscript "catch {focus $oldFocus}; destroy $w; unregister_active 23; catch {destroy .menu21}; unregister_active 21; menu24 .menu24 \"$title\""
 	frame $w.f
 	button $w.f.back -text "OK" \
 		-width 15 -command "catch {focus $oldFocus}; destroy $w; unregister_active 23"
@@ -4904,28 +4906,27 @@ proc update_define_menu23 {} {
 }
 
 
-menu_option menu24 24 "VHDL Debugging        "
 proc menu24 {w title} {
 	set oldFocus [focus]
+	catch {focus .menu13}
 	catch {destroy $w; unregister_active 24}
 	toplevel $w -class Dialog
 	wm withdraw $w
 	global active_menus
 	set active_menus [lsort -integer [linsert $active_menus end 24]]
 	message $w.m -width 400 -aspect 300 -text \
-		"VHDL Debugging        "  -relief raised
+		"ps2vga"  -relief raised
 	pack $w.m -pady 10 -side top -padx 10
-	wm title $w "VHDL Debugging        " 
+	wm title $w "ps2vga" 
 
 	bind $w <Escape> "catch {focus $oldFocus}; destroy $w; unregister_active 24; break"
-	set nextscript "catch {focus $oldFocus}; menu25 .menu25 \"$title\""
+	set nextscript "catch {focus $oldFocus}; destroy $w; unregister_active 24; catch {destroy .menu13}; unregister_active 13; menu25 .menu25 \"$title\""
 	frame $w.f
-	button $w.f.back -text "Main Menu" \
+	button $w.f.back -text "OK" \
 		-width 15 -command "catch {focus $oldFocus}; destroy $w; unregister_active 24"
 	button $w.f.next -text "Next" -underline 0\
 		-width 15 -command $nextscript
-	$w.f.next configure -state disabled
-	bind all <Alt-n> "puts \"no more menus\" "
+	bind all <Alt-n> $nextscript
 	button $w.f.prev -text "Prev" -underline 0\
 		-width 15 -command "catch {focus $oldFocus}; destroy $w; unregister_active 24; menu23 .menu23 \"$title\""
 	bind $w <Alt-p> "catch {focus $oldFocus}; destroy $w; unregister_active 24; menu23 .menu23 \"$title\";break"
@@ -4956,7 +4957,116 @@ proc menu24 {w title} {
 	pack $w.config.canvas -side right -fill y
 
 
-	bool $w.config.f 24 0 "Accelerated UART tracing       " CONFIG_DEBUG_UART
+	bool $w.config.f 24 0 "Keyboard/mouse (PS2) interface  " CONFIG_KBD_ENABLE
+	bool $w.config.f 24 1 "Text-based VGA interface  " CONFIG_VGA_ENABLE
+	bool $w.config.f 24 2 "SVGA graphical frame buffer  " CONFIG_SVGA_ENABLE
+
+
+
+	focus $w
+	update_active
+	global winx; global winy
+	if {[winfo exists .menu13] == 0} then {menu13 .menu13 "Peripherals             "}
+	set winx [expr [winfo x .menu13]+30]; set winy [expr [winfo y .menu13]+30]
+	if {[winfo exists $w]} then {wm geometry $w +$winx+$winy}
+	update idletasks
+	if {[winfo exists $w]} then  {$w.config.canvas create window 0 0 -anchor nw -window $w.config.f
+
+	$w.config.canvas configure \
+		-width [expr [winfo reqwidth $w.config.f] + 1]\
+		-scrollregion "-1 -1 [expr [winfo reqwidth $w.config.f] + 1] \
+			 [expr [winfo reqheight $w.config.f] + 1]"
+
+	set winy [expr [winfo reqh $w] - [winfo reqh $w.config.canvas]]
+	set scry [expr [winfo screenh $w] / 2]
+	set maxy [expr [winfo screenh $w] * 3 / 4]
+	set canvtotal [expr [winfo reqh $w.config.f] + 2]
+	if [expr $winy + $canvtotal < $maxy] {
+		$w.config.canvas configure -height $canvtotal
+	} else {
+		$w.config.canvas configure -height [expr $scry - $winy]
+		}
+	}
+	update idletasks
+	if {[winfo exists $w]} then {
+	wm maxsize $w [winfo width $w] [winfo screenheight $w]
+	wm minsize $w [winfo width $w] 100
+
+	wm deiconify $w
+}
+}
+
+proc update_menu24 {} {
+	global CONFIG_VGA_ENABLE
+	global CONFIG_SVGA_ENABLE
+	if {($CONFIG_VGA_ENABLE == 0)} then {
+	configure_entry .menu24.config.f.x2 normal {n l y}} else {configure_entry .menu24.config.f.x2 disabled {y n l}}
+}
+
+
+proc update_define_menu24 {} {
+	update_define_mainmenu
+	global CONFIG_MODULES
+	global CONFIG_VGA_ENABLE
+	global CONFIG_SVGA_ENABLE
+	if {($CONFIG_VGA_ENABLE == 0)} then {
+	set CONFIG_SVGA_ENABLE [expr $CONFIG_SVGA_ENABLE&15]} else {set CONFIG_SVGA_ENABLE [expr $CONFIG_SVGA_ENABLE|16]}
+}
+
+
+menu_option menu25 25 "VHDL Debugging        "
+proc menu25 {w title} {
+	set oldFocus [focus]
+	catch {destroy $w; unregister_active 25}
+	toplevel $w -class Dialog
+	wm withdraw $w
+	global active_menus
+	set active_menus [lsort -integer [linsert $active_menus end 25]]
+	message $w.m -width 400 -aspect 300 -text \
+		"VHDL Debugging        "  -relief raised
+	pack $w.m -pady 10 -side top -padx 10
+	wm title $w "VHDL Debugging        " 
+
+	bind $w <Escape> "catch {focus $oldFocus}; destroy $w; unregister_active 25; break"
+	set nextscript "catch {focus $oldFocus}; menu26 .menu26 \"$title\""
+	frame $w.f
+	button $w.f.back -text "Main Menu" \
+		-width 15 -command "catch {focus $oldFocus}; destroy $w; unregister_active 25"
+	button $w.f.next -text "Next" -underline 0\
+		-width 15 -command $nextscript
+	$w.f.next configure -state disabled
+	bind all <Alt-n> "puts \"no more menus\" "
+	button $w.f.prev -text "Prev" -underline 0\
+		-width 15 -command "catch {focus $oldFocus}; destroy $w; unregister_active 25; menu24 .menu24 \"$title\""
+	bind $w <Alt-p> "catch {focus $oldFocus}; destroy $w; unregister_active 25; menu24 .menu24 \"$title\";break"
+	pack $w.f.back $w.f.next $w.f.prev -side left -expand on
+	pack $w.f -pady 10 -side bottom -anchor w -fill x
+	frame $w.topline -relief ridge -borderwidth 2 -height 2
+	pack $w.topline -side top -fill x
+
+	frame $w.botline -relief ridge -borderwidth 2 -height 2
+	pack $w.botline -side bottom -fill x
+
+	frame $w.config
+	pack $w.config -fill y -expand on
+
+	scrollbar $w.config.vscroll -command "$w.config.canvas yview"
+	pack $w.config.vscroll -side right -fill y
+
+	canvas $w.config.canvas -height 1\
+		-relief flat -borderwidth 0 -yscrollcommand "$w.config.vscroll set" \
+		-width [expr [winfo screenwidth .] * 1 / 2] 
+	frame $w.config.f
+	bind $w <Key-Down> "$w.config.canvas yview scroll  1 unit;break;"
+	bind $w <Key-Up> "$w.config.canvas yview scroll  -1 unit;break;"
+	bind $w <Key-Next> "$w.config.canvas yview scroll  1 page;break;"
+	bind $w <Key-Prior> "$w.config.canvas yview scroll  -1 page;break;"
+	bind $w <Key-Home> "$w.config.canvas yview moveto 0;break;"
+	bind $w <Key-End> "$w.config.canvas yview moveto 1 ;break;"
+	pack $w.config.canvas -side right -fill y
+
+
+	bool $w.config.f 25 0 "Accelerated UART tracing       " CONFIG_DEBUG_UART
 
 
 
@@ -4992,11 +5102,11 @@ proc menu24 {w title} {
 }
 }
 
-proc update_menu24 {} {
+proc update_menu25 {} {
 }
 
 
-proc update_define_menu24 {} {
+proc update_define_menu25 {} {
 	update_define_mainmenu
 	global CONFIG_MODULES
 }
@@ -5408,6 +5518,9 @@ set tmpvar_33 "(not set)"
 set CONFIG_SPICTRL_NOFT 0
 set CONFIG_SPICTRL_DMRFT 0
 set CONFIG_SPICTRL_TMRFT 0
+set CONFIG_KBD_ENABLE 0
+set CONFIG_VGA_ENABLE 0
+set CONFIG_SVGA_ENABLE 0
 set CONFIG_DEBUG_UART 0
 set CONFIG_SYN_ARTISAN 4
 set CONFIG_PCI_ENABLE 4
@@ -6226,6 +6339,13 @@ proc writeconfig {file1 file2} {
 	if { $tmpvar_33 == "None" } then { write_tristate $cfg $autocfg CONFIG_SPICTRL_NOFT 1 [list $notmod] 2 } else { write_tristate $cfg $autocfg CONFIG_SPICTRL_NOFT 0 [list $notmod] 2 }
 	if { $tmpvar_33 == "Parity-DMR" } then { write_tristate $cfg $autocfg CONFIG_SPICTRL_DMRFT 1 [list $notmod] 2 } else { write_tristate $cfg $autocfg CONFIG_SPICTRL_DMRFT 0 [list $notmod] 2 }
 	if { $tmpvar_33 == "TMR" } then { write_tristate $cfg $autocfg CONFIG_SPICTRL_TMRFT 1 [list $notmod] 2 } else { write_tristate $cfg $autocfg CONFIG_SPICTRL_TMRFT 0 [list $notmod] 2 }}
+	write_comment $cfg $autocfg "ps2vga"
+	global CONFIG_KBD_ENABLE
+	write_tristate $cfg $autocfg CONFIG_KBD_ENABLE $CONFIG_KBD_ENABLE [list $notmod] 2
+	global CONFIG_VGA_ENABLE
+	write_tristate $cfg $autocfg CONFIG_VGA_ENABLE $CONFIG_VGA_ENABLE [list $notmod] 2
+	global CONFIG_SVGA_ENABLE
+	if {($CONFIG_VGA_ENABLE == 0)} then {write_tristate $cfg $autocfg CONFIG_SVGA_ENABLE $CONFIG_SVGA_ENABLE [list $notmod] 2 }
 	write_comment $cfg $autocfg "VHDL Debugging        "
 	global CONFIG_DEBUG_UART
 	write_tristate $cfg $autocfg CONFIG_DEBUG_UART $CONFIG_DEBUG_UART [list $notmod] 2

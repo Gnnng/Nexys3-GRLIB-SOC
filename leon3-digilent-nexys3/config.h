@@ -298,6 +298,11 @@
  */
 #undef  CONFIG_SPICTRL_ENABLE
 /*
+ * ps2vga
+ */
+#define CONFIG_KBD_ENABLE 1
+#define CONFIG_VGA_ENABLE 1
+/*
  * VHDL Debugging        
  */
 #define CONFIG_DEBUG_UART 1
