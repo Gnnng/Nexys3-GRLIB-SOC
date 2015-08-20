@@ -75,6 +75,11 @@ comment 'Peripherals             '
     source lib/gaisler/spi/spictrl.in
   endmenu
 
+  mainmenu_option next_comment
+  comment 'ps2vga'
+    source lib/gaisler/misc/ps2vga.in
+  endmenu
+
 endmenu
 
 mainmenu_option next_comment

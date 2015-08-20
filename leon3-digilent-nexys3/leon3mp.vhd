@@ -96,12 +96,12 @@ entity leon3mp is
     btn             : in    std_logic_vector(4 downto 0); -- reset on btn0
 
     -- VGA Connector
-    --vgaRed          : out   std_logic_vector(2 downto 0);
-    --vgaGreen        : out   std_logic_vector(2 downto 0);
-    --vgaBlue         : out   std_logic_vector(2 downto 1);
+    vgaRed          : out   std_logic_vector(2 downto 0);
+    vgaGreen        : out   std_logic_vector(2 downto 0);
+    vgaBlue         : out   std_logic_vector(2 downto 1);
 
-    --Hsync           : out   std_ulogic;
-    --Vsync           : out   std_ulogic;
+    Hsync           : out   std_ulogic;
+    Vsync           : out   std_ulogic;
 
     -- 12 pin connectors
     --ja              : inout std_logic_vector(7 downto 0);
@@ -130,8 +130,8 @@ entity leon3mp is
 
 
     -- Pic USB-HID interface
-    --PS2KeyboardData : inout std_logic;
-    --PS2KeyboardClk  : inout std_logic;
+    PS2KeyboardData : inout std_logic;
+    PS2KeyboardClk  : inout std_logic;
 
     --PS2MouseData    : inout std_logic;
     --PS2MouseClk     : inout std_logic;
@@ -198,7 +198,17 @@ architecture rtl of leon3mp is
   -- RS232 APB Uart
   signal rxd1 : std_logic;
   signal txd1 : std_logic;
-  
+
+  -- APB ps2vga
+  signal kbdi  : ps2_in_type;
+  signal kbdo  : ps2_out_type;
+  signal vgao  : apbvga_out_type;
+  signal clkval : std_logic_vector(1 downto 0);
+
+  signal dac_clk, clk1x, vid_clock, video_clk, clkvga : std_logic;  -- signals to vga_clkgen.
+  signal clk_sel : std_logic_vector(1 downto 0);
+  -- APB ps2vga end
+ 
   attribute keep                     : boolean;
   attribute syn_keep                 : boolean;
   attribute syn_preserve             : boolean;
@@ -210,7 +220,10 @@ architecture rtl of leon3mp is
   attribute keep of lock             : signal is true;
   attribute keep of clkml            : signal is true;
   attribute keep of clkm             : signal is true;
-
+  attribute syn_keep of video_clk : signal is true;
+  attribute syn_preserve of video_clk : signal is true;
+  attribute keep of video_clk : signal is true;
+ 
   constant BOARD_FREQ : integer := 100000;                                -- CLK input frequency in KHz
   constant CPU_FREQ   : integer := BOARD_FREQ * CFG_CLKMUL / CFG_CLKDIV;  -- cpu frequency in KHz
 begin
@@ -233,7 +246,7 @@ begin
   -- clock generator
   clkgen0 : clkgen
     generic map (fabtech, CFG_CLKMUL, CFG_CLKDIV, 0, 0, 0, 0, 0, BOARD_FREQ, 0)
-    port map (clk, gnd, clkm, open, open, open, open, cgi, cgo, open, open, open);
+    port map (clk, gnd, clkm, open, open, open, open, cgi, cgo, open, open, clk1x);
 
 ---------------------------------------------------------------------- 
 ---  AHB CONTROLLER --------------------------------------------------
@@ -404,6 +417,63 @@ begin
   nospi: if CFG_SPICTRL_ENABLE = 0 and CFG_SPIMCTRL = 0 generate
     apbo(7) <= apb_none;
   end generate;
+
+  kbd : if CFG_KBD_ENABLE /= 0 generate
+    ps20 : apbps2 generic map(pindex => 5, paddr => 5, pirq => 5)
+    port map(rstn, clkm, apbi, apbo(5), kbdi, kbdo);
+  end generate;
+  nokbd : if CFG_KBD_ENABLE = 0 generate
+    apbo(5) <= apb_none; kbdo <= ps2o_none;
+  end generate;
+  kbdclk_pad : iopad generic map (tech => padtech)
+    port map (PS2KeyboardClk,kbdo.ps2_clk_o, kbdo.ps2_clk_oe, kbdi.ps2_clk_i);
+  kbdata_pad : iopad generic map (tech => padtech)
+    port map (PS2KeyboardData, kbdo.ps2_data_o, kbdo.ps2_data_oe, kbdi.ps2_data_i);
+
+  clkdiv : process(clkm, rstn)
+    begin
+    if rstn = '0' then clkval <= "00";
+    elsif rising_edge(clkm) then
+    clkval <= clkval + 1;
+    end if;
+  end process;
+
+  vga : if CFG_VGA_ENABLE /= 0 generate
+    vga0 : apbvga generic map(memtech => memtech, pindex => 6, paddr => 6)
+    port map(rstn, clkm, video_clk, apbi, apbo(6), vgao);
+    video_clock_pad : outpad generic map ( tech => padtech)
+    port map (vid_clock, dac_clk);
+    dac_clk <= not video_clk;
+    b1 : techbuf generic map (2, spartan6) port map (clkval(0), video_clk);
+   end generate;
+
+  svga : if CFG_SVGA_ENABLE /= 0 generate
+    clkvga <= clkval(1) when clk_sel = "00" else clkval(0) when clk_sel = "01" else clkm;
+    b1 : techbuf generic map (2, spartan6) port map (clkvga, video_clk);
+    svga0 : svgactrl generic map(memtech => memtech, pindex => 6, paddr => 6,
+       hindex => CFG_NCPU+CFG_AHB_JTAG,
+       clk0 => 40000, clk1 => 20000, clk2 => 25000)
+      port map(rstn, clkm, video_clk, apbi, apbo(6), vgao, ahbmi,
+       ahbmo(CFG_NCPU+CFG_AHB_JTAG), clk_sel);
+    dac_clk <= not video_clk;
+    video_clock_pad : outpad generic map ( tech => padtech)
+       port map (vid_clock, dac_clk);
+  end generate;
+
+  novga : if (CFG_VGA_ENABLE = 0 and CFG_SVGA_ENABLE = 0) generate
+    apbo(6) <= apb_none; vgao <= vgao_none;
+  end generate;
+
+  vert_sync_pad : outpad generic map (tech => padtech)
+    port map (Vsync, vgao.vsync);
+  horiz_sync_pad : outpad generic map (tech => padtech)
+    port map (Hsync, vgao.hsync);
+  video_out_r_pad : outpadv generic map (tech => padtech, width => 3)
+    port map (vgaRed, vgao.video_out_r(7 downto 5));
+  video_out_g_pad : outpadv generic map (tech => padtech, width => 3)
+    port map (vgaGreen, vgao.video_out_g(7 downto 5));
+  video_out_b_pad : outpadv generic map (tech => padtech, width => 2)
+    port map (vgaBlue, vgao.video_out_b(7 downto 6)); 
 
 -----------------------------------------------------------------------
 ---  ETHERNET ---------------------------------------------------------
